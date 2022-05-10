@@ -43,7 +43,9 @@ def _recurse_cli(
         if get_help:  # gets formatted CLI help incl params for printing
             io_dict[cli_element.name] = cli_element.get_help(ctx)
         else:  # gets params for structure purposes
-            nested_parameter_list = [option.opts for option in cli_element.get_params(ctx)]
+            nested_parameter_list = [
+                option.opts for option in cli_element.get_params(ctx)
+            ]
             io_dict[cli_element.name] = dict.fromkeys(
                 [item for sublist in nested_parameter_list for item in sublist], None
             )
