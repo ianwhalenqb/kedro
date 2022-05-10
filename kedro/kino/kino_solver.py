@@ -2,10 +2,10 @@
 of parallel node-running for ``KinoRunner``, using a ``pyomo`` linear program.
 """
 # pylint: disable=invalid-name
-
+import typing
 from itertools import product
 from math import ceil
-from typing import Dict
+from typing import Dict, Tuple, Set
 
 import pandas as pd
 from pyomo.core.util import quicksum
@@ -88,6 +88,7 @@ class KinoSolver:
         self.opt_results = None
         self.optimal_objective = None
         self._schedule_dict = None
+        self._node_worker = None
 
     def _define_model_structure(self):
         """Set up model structure incl. params, sets, variables, objective, constraints."""
@@ -140,10 +141,10 @@ class KinoSolver:
 
     def instantiate_from_data(
         self,
-        nodes: set[Node],
+        nodes: typing.Set[Node],
         n_workers: int,
         proc_time: Dict[str, float],
-        dependency: Dict[Node, set[Node]],
+        dependency: Dict[Node, typing.Set[Node]],
     ):
         """Create model instance from input data."""
         node_names = [n.name for n in nodes]
@@ -194,7 +195,7 @@ class KinoSolver:
         ):
             raise ValueError("Problem is infeasible.")
 
-    def get_schedule(self) -> Dict[int, str]:
+    def get_schedule(self) -> Tuple[Dict[int, str], Dict[str, int]]:
         """Return the optimized run schedule for each worker."""
         if (self.opt_results.solver.status != SolverStatus.ok) or (
             self.opt_results.solver.termination_condition
@@ -218,4 +219,10 @@ class KinoSolver:
             .to_dict()["job"]
         )
 
-        return self._schedule_dict
+        self._node_worker = (
+            x_df[x_df["value"] == 1][["job", "worker"]]
+            .set_index("job")
+            .to_dict()["worker"]
+        )
+
+        return self._schedule_dict, self._node_worker
