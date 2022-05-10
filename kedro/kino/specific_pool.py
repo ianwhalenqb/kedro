@@ -1,0 +1,3 @@
+"""
+Specific pool class definition.
+"""

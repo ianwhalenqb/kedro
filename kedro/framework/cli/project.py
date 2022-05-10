@@ -326,6 +326,13 @@ def activate_nbstripout(
     help=PARAMS_ARG_HELP,
     callback=_split_params,
 )
+@click.option(
+    "--jobs",
+    type=click.INT,
+    default=None,
+    help="Number of jobs to use if running in parallel.",
+    multiple=False,
+)
 # pylint: disable=too-many-arguments,unused-argument
 def run(
     tag,
@@ -341,6 +348,7 @@ def run(
     pipeline,
     config,
     params,
+    jobs,
 ):
     """Run the pipeline."""
     runner = load_obj(runner or "SequentialRunner", "kedro.runner")
@@ -348,10 +356,14 @@ def run(
     tag = _get_values_as_tuple(tag) if tag else tag
     node_names = _get_values_as_tuple(node_names) if node_names else node_names
 
+    from kedro.runner import ParallelRunner
+
     with KedroSession.create(env=env, extra_params=params) as session:
         session.run(
             tags=tag,
-            runner=runner(is_async=is_async),
+            runner=runner(max_workers=jobs, is_async=is_async)
+            if issubclass(runner, ParallelRunner)
+            else runner(is_async=is_async),
             node_names=node_names,
             from_nodes=from_nodes,
             to_nodes=to_nodes,

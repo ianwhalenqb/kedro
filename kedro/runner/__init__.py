@@ -6,6 +6,7 @@ from .parallel_runner import ParallelRunner
 from .runner import AbstractRunner, run_node
 from .sequential_runner import SequentialRunner
 from .thread_runner import ThreadRunner
+from .kino_runner import KinoRunner
 
 __all__ = [
     "AbstractRunner",
@@ -13,4 +14,5 @@ __all__ = [
     "SequentialRunner",
     "ThreadRunner",
     "run_node",
+    "KinoRunner",
 ]
