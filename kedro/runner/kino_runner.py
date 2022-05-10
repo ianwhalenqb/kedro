@@ -74,7 +74,7 @@ class KinoRunner(ParallelRunner):
         }
 
         solver.instantiate_from_data(**solver_data)
-        solver.solve("cbc")
+        solver.solve()
 
         # Get node -> worker mapping from optimization.
         optimized_schedule, node_workers = solver.get_schedule()
