@@ -46,8 +46,6 @@ def _process_worker(call_queue, result_queue, initializer, initargs):
             # mark the pool broken
             return
     while True:
-        print(f"In process {os.getpid()}, queue id: {id(call_queue)}")
-
         call_item = call_queue.get(block=True)
         if call_item is None:
             # Wake up queue management thread
@@ -314,26 +312,26 @@ class SpecificProcessPoolExecutor(ProcessPoolExecutor):
 
     def shutdown(self, wait=True):
         """Override shutdown."""
+        if self._call_queue is not None:
+            for q in self._call_queue:
+                q.put_nowait(None)
+
         with self._shutdown_lock:
             self._shutdown_thread = True
+
         if self._queue_management_thread:
             # Wake up queue management thread
             self._queue_management_thread_wakeup.wakeup()
+
             if wait:
                 self._queue_management_thread.join()
 
         # To reduce the risk of opening too many files, remove references to
         # objects that use file descriptors.
+        for i, _ in enumerate(self._call_queue):
+            self._call_queue[i] = None
+
         self._queue_management_thread = None
-        if self._call_queue is not None:
-            for i, q in enumerate(self._call_queue):
-                q.close()
-
-                if wait:
-                    q.join_thread()
-
-                self._call_queue[i] = None
-
         self._result_queue = None
         self._processes = None
 
