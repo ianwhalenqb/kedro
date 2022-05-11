@@ -63,20 +63,6 @@ class KinoRunner(ParallelRunner):
         done = None
         max_workers = self._get_required_workers_count(pipeline)
 
-        # TODO: Get node -> worker mapping from optimization.
-        # call get_machines(pipeline, self.runtime) then maybe invert the keys/items.
-        node_workers = {
-            "job_1": 1,
-            "job_2": 0,
-            "job_3": 0,
-            "job_4": 0,
-            "job_5": 1,
-            "job_6": 0,
-            "job_7": 2,
-        }
-        for node in nodes:
-            assert node.name in node_workers
-
         from kedro.framework.project import LOGGING, PACKAGE_NAME
 
         with SpecificProcessPoolExecutor(max_workers=max_workers) as pool:
