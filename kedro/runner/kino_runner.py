@@ -8,6 +8,7 @@ from kedro.runner.parallel_runner import (
     _run_node_synchronization,
 )
 from kedro.kino.specific_pool import SpecificProcessPoolExecutor
+from kedro.kino.kino_solver import KinoSolver
 
 from collections import Counter
 from concurrent.futures import FIRST_COMPLETED, ProcessPoolExecutor, wait
@@ -29,8 +30,7 @@ TIME_INDEX = ["node_name", "session_id"]
 
 
 class KinoRunner(ParallelRunner):
-    """Kedro intelligent node ordering runner.
-    """
+    """Kedro intelligent node ordering runner."""
 
     def __init__(self, max_workers: int = None, is_async: bool = False):
         """Constructor."""
@@ -63,11 +63,40 @@ class KinoRunner(ParallelRunner):
         done = None
         max_workers = self._get_required_workers_count(pipeline)
 
+        # Create solver instance and
+        solver = KinoSolver()
+
+        solver_data = {
+            "nodes": todo_nodes,
+            "n_workers": max_workers,
+            "proc_time": self.runtimes,
+            "dependency": node_dependencies,
+        }
+
+        solver.instantiate_from_data(**solver_data)
+        solver.solve()
+
+        # Get node -> worker mapping from optimization.
+        optimized_schedule, node_workers = solver.get_schedule()
+
+        for node in nodes:
+            assert node.name in node_workers
+
         from kedro.framework.project import LOGGING, PACKAGE_NAME
 
         with SpecificProcessPoolExecutor(max_workers=max_workers) as pool:
             while True:
-                ready = {n for n in todo_nodes if node_dependencies[n] <= done_nodes}
+                next_nodes_in_queue = [
+                    optimized_schedule[n][0]
+                    for n in optimized_schedule
+                    if len(optimized_schedule[n]) > 0
+                ]
+                ready = {
+                    n
+                    for n in todo_nodes
+                    if (node_dependencies[n] <= done_nodes)
+                    and (n.name in next_nodes_in_queue)
+                }
                 todo_nodes -= ready
                 for node in ready:
                     futures.add(
@@ -79,9 +108,11 @@ class KinoRunner(ParallelRunner):
                             session_id,
                             package_name=PACKAGE_NAME,
                             conf_logging=LOGGING,
-                            __worker_num=node_workers[node.name]
+                            __worker_num=node_workers[node.name],
                         )
                     )
+                    submitted_node = optimized_schedule[node_workers[node.name]].pop(0)
+                    assert node.name == submitted_node
                 if not futures:
                     if todo_nodes:
                         debug_data = {
