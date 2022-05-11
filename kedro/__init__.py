@@ -3,7 +3,7 @@ data pipelines by providing uniform project templates, data abstraction,
 configuration and pipeline assembly.
 """
 
-__version__ = "0.18.0kino"
+__version__ = "9001.0.0"
 
 
 import logging
