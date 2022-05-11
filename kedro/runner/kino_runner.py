@@ -11,7 +11,7 @@ from kedro.kino.specific_pool import SpecificProcessPoolExecutor
 from kedro.kino.kino_solver import KinoSolver
 
 from collections import Counter
-from concurrent.futures import FIRST_COMPLETED, ProcessPoolExecutor, wait
+from concurrent.futures import FIRST_COMPLETED, ALL_COMPLETED, wait
 from itertools import chain
 from multiprocessing.managers import BaseProxy, SyncManager  # type: ignore
 from typing import Set
@@ -66,10 +66,11 @@ class KinoRunner(ParallelRunner):
         # Create solver instance and
         solver = KinoSolver()
 
+        node_names = set(n.name for n in todo_nodes)
         solver_data = {
             "nodes": todo_nodes,
             "n_workers": max_workers,
-            "proc_time": self.runtimes,
+            "proc_time": {k: v for k, v in self.runtimes.items() if k in node_names},
             "dependency": node_dependencies,
         }
 
@@ -83,6 +84,8 @@ class KinoRunner(ParallelRunner):
             assert node.name in node_workers
 
         from kedro.framework.project import LOGGING, PACKAGE_NAME
+
+        submitted_futures = 0
 
         with SpecificProcessPoolExecutor(max_workers=max_workers) as pool:
             while True:
@@ -111,6 +114,9 @@ class KinoRunner(ParallelRunner):
                             __worker_num=node_workers[node.name],
                         )
                     )
+
+                    submitted_futures += 1
+
                     submitted_node = optimized_schedule[node_workers[node.name]].pop(0)
                     assert node.name == submitted_node
                 if not futures:
@@ -129,8 +135,15 @@ class KinoRunner(ParallelRunner):
                             f"have not been run:\n{debug_data_str}"
                         )
                     break  # pragma: no cover
-                done, futures = wait(futures, return_when=FIRST_COMPLETED)
-                for future in done:
+
+                done, futures = wait(
+                    futures,
+                    return_when=FIRST_COMPLETED
+                    if submitted_futures < len(nodes)
+                    else ALL_COMPLETED,
+                )
+
+                for future in done:  # noqa
                     try:
                         node = future.result()
                     except Exception:
